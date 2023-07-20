@@ -1,0 +1,44 @@
+Empatica Data Viewer installation:
+
+1. Install Python from https://www.python.org/
+(Downloads > macOS > Latest Python 3 Release > macOS 64-bit universal2 installer)
+
+
+2. Download the EmpaticaDataViewer.py file and put it in your home directory (with the home icon on the left-hand menu in Finder.
+
+
+3. Open up a Terminal window (command-F Terminal) and type the following commands:
+
+pip3 install numpy
+python3 -m pip install scipy
+python3 -m pip install -U matplotlib
+pip3 install astropy
+python3 -m pip install heartpy
+pip3 install pytz
+
+If at some point you are prompted to install command line tools, do it and then continue from the last step that worked.
+
+You can close the Terminal window when this is all done.
+
+
+
+To run the program once installed:
+
+1. Open a Terminal window (command-F Terminal).
+
+
+2. Type the following command:
+
+python3 EmpaticaDataViewer.py
+
+
+3. Press the Open button, navigate to the folder that contains the session files, and click Choose. Clicking on the Macintosh HD dropdown will show Recent Places, which is very helpful for finding the right part of your directory structure if you're doing several sessions in a row. The spinning rainbow will come up while it reads in the data -- this might be a couple of minutes for very long sessions. Don't close the Terminal until you are finished.
+
+
+4. To zoom in, click and drag your mouse horizontally across the relevant part of any one of the graphs. If you do it slowly, a gray shaded box will show you the region you've selected. You can zoom in multiple times, and the Unzoom button will back out one level at a time.
+
+
+5. Print to File button should operate as expected.
+
+
+6. To bring up more windows, create a new terminal window by doing command-N in Terminal, then go back to step 2 in the new terminal window.
