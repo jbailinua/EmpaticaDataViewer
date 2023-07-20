@@ -335,9 +335,9 @@ class EmpaticaSession:
             interval_timelist = interval_times_s[good_intervals]
             
             # Now do frequency analysis as in calculate_HRV_from_IBI
-            segment_nanalyze = 6 # number of segments
-            segment_length = 15. # seconds per unit
-            nv_thresh = 10  # don't use if there are not at least this many valid intervals
+            segment_nanalyze = 4 # number of segments
+            segment_length = 30. # seconds per unit
+            nv_thresh = 15  # don't use if there are not at least this many valid intervals
             
             # Find time borders
             tmax = interval_timelist[-1] + 1.
