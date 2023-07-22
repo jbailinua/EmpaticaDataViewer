@@ -1,5 +1,5 @@
 import tkinter as tk
-from tkinter.ttk import Button, OptionMenu, Label
+from tkinter.ttk import Button, OptionMenu, Label, Entry, Separator
 import matplotlib as mpl
 
 mpl.use('TkAgg')
@@ -17,7 +17,6 @@ import numpy as np
 from scipy.interpolate import interp1d
 
 import heartpy as hp
-
 
 
 class EmpaticaData:
@@ -40,16 +39,16 @@ class EmpaticaSession:
     def read_data(self, directoryname):
         self.EDA = EmpaticaSession.read_csv_1(f'{directoryname}/EDA.csv')
         self.BVP = EmpaticaSession.read_csv_1(f'{directoryname}/BVP.csv', scale=0.01, optional=True) #?
-        self.accel = EmpaticaSession.read_csv_3(f'{directoryname}/ACC.csv', scale=1./64, optional=True)
-        self.accel.data -= 1.0
+        self.Accel = EmpaticaSession.read_csv_3(f'{directoryname}/ACC.csv', scale=1./64, optional=True)
+        self.Accel.data -= 1.0
         self.HR = EmpaticaSession.read_csv_1(f'{directoryname}/HR.csv')
-        self.temp = EmpaticaSession.read_csv_1(f'{directoryname}/TEMP.csv')
+        self.Temp = EmpaticaSession.read_csv_1(f'{directoryname}/TEMP.csv')
         self.IBI = EmpaticaSession.read_IBI(f'{directoryname}/IBI.csv', optional=True)
 #         self.HRV = self.calculate_HRV_from_IBI()
 #         self.HRV = self.calculate_HRV_from_BVP()
         self.HRV = self.calculate_HRV_from_IBIBVP()
         self.tags = EmpaticaSession.read_tags(f'{directoryname}/tags.csv')
-        self.data_sources = ['EDA','BVP','accel','HR','temp','HRV']
+        self.data_sources = ['EDA','BVP','Accel','HR','Temp','HRV']
         
     def __getitem__(self, key):
         if key in self.data_sources:
@@ -418,6 +417,7 @@ class Application(tk.Frame):
     button_down_status = False # keep track of double mouseups
     mousemove_cid = None
     xhighlightpoly = {}
+    ylim_dialog = None
     
     def __init__(self, master=None):
         super().__init__(master)
@@ -425,7 +425,11 @@ class Application(tk.Frame):
         self.createUI()
         self.pack()
         
-        self.axes = {'EDA':None, 'BVP':None, 'accel':None, 'HR':None, 'temp':None}
+        self.axes = {'EDA':None, 'BVP':None, 'Accel':None, 'HR':None, 'HRV':None, 'Temp':None}
+        self.ylims = {}
+        for ax in self.axes.keys():
+            self.ylims[ax] = [None,None]
+            
         
     def createUI(self):
         # grid
@@ -447,6 +451,8 @@ class Application(tk.Frame):
         self.changetz_menu = OptionMenu(self.topFrame, self.tzval, default_tz, *tzoptions, command=self.change_tz)
         self.tzval.set(default_tz)
         self.changetz_menu.pack(side=tk.LEFT)
+        self.changelimits_btn = Button(self.topFrame, text="Change Limits", command=self.change_ylim_dialog)
+        self.changelimits_btn.pack(side=tk.RIGHT)
         
         # plot area
         self.plotFrame = tk.Frame(self.master)
@@ -483,24 +489,24 @@ class Application(tk.Frame):
         axes = self.plot_figure.subplot_mosaic(mosaic, sharex=True)
         self.axes['EDA'] = axes['A']
         self.axes['BVP'] = axes['B']
-        self.axes['accel'] = axes['C']
+        self.axes['Accel'] = axes['C']
         self.axes['HR'] = axes['D']
         self.axes['HRV'] = axes['E']
-        self.axes['temp'] = axes['F']
+        self.axes['Temp'] = axes['F']
         
         self.axes['EDA'].set_ylabel('EDA (µS)')
         self.axes['EDA'].set_xticks([])
         self.axes['BVP'].set_ylabel('BVP')
         self.axes['BVP'].set_xticks([])
-        self.axes['accel'].set_ylabel('Accel (g)')
-        self.axes['accel'].set_xticks([])
+        self.axes['Accel'].set_ylabel('Accel (g)')
+        self.axes['Accel'].set_xticks([])
         self.axes['HR'].set_ylabel('HR (BPM)')
         self.axes['HR'].set_xticks([])
         self.axes['HRV'].set_ylabel('HF HRV (ms$^2$)')
         self.axes['HRV'].set_xticks([])
-        self.axes['temp'].set_ylabel('Temp (°C)')
-        self.axes['temp'].xaxis.set_major_locator(self.datelocator)
-        self.axes['temp'].xaxis.set_major_formatter(self.dateformatter)
+        self.axes['Temp'].set_ylabel('Temp (°C)')
+        self.axes['Temp'].xaxis.set_major_locator(self.datelocator)
+        self.axes['Temp'].xaxis.set_major_formatter(self.dateformatter)
         
         # Create button callbacks
         self.plot_figure.canvas.mpl_connect('button_press_event', lambda e: self.on_mousedown(e))
@@ -508,6 +514,7 @@ class Application(tk.Frame):
         self.plot_figure.canvas.mpl_connect('motion_notify_event', lambda e: self.on_mouse_selecting(e))
         self.plot_figure.canvas.mpl_connect('axes_enter_event', lambda e: self.on_newtime(e))
         self.plot_figure.canvas.mpl_connect('axes_leave_event', lambda e: self.on_outaxes(e))
+        
         
     def on_mousedown(self, event):
         if event.xdata is not None:
@@ -623,24 +630,40 @@ class Application(tk.Frame):
             color='tab:blue')
         self.line['BVP'], = self.axes['BVP'].plot(self.session_data.BVP.time, self.session_data.BVP.data, \
             color='tab:brown')
-        self.line['accel'], = self.axes['accel'].plot(self.session_data.accel.time, self.session_data.accel.data, \
+        self.line['Accel'], = self.axes['Accel'].plot(self.session_data.Accel.time, self.session_data.Accel.data, \
             color='tab:purple')
         self.line['HR'], = self.axes['HR'].plot(self.session_data.HR.time, self.session_data.HR.data, \
             color='tab:orange')
         self.line['HRV'], = self.axes['HRV'].plot(self.session_data.HRV.time, self.session_data.HRV.data, \
             color='tab:pink')
-        self.line['temp'], = self.axes['temp'].plot(self.session_data.temp.time, self.session_data.temp.data, \
+        self.line['Temp'], = self.axes['Temp'].plot(self.session_data.Temp.time, self.session_data.Temp.data, \
             color='tab:green')
         
         self.draw_tags()
                 
-        self.base_zoom = self.axes['temp'].get_xlim()
+        self.base_zoom = self.axes['Temp'].get_xlim()
+        self.update_ylims()
                 
         self.plot_figure.canvas.draw()
         
         # Get bg for blitting
         self.blit_bg = self.plot_figure.canvas.copy_from_bbox(self.plot_figure.bbox)
 
+
+    def update_ylims(self):
+        for ax in self.axes.keys():
+            self.axes[ax].set_ylim(*self.ylims[ax])
+        self.plot_figure.canvas.draw()
+        self.blit_bg = self.plot_figure.canvas.copy_from_bbox(self.plot_figure.bbox)
+            
+            
+    def change_ylim_dialog(self):
+        if self.ylim_dialog is None:
+            self.ylim_dialog = LimitDialog(self)
+        else:
+            self.ylim_dialog.lift()          
+                
+        
         
     def draw_tags(self):
         for t in self.session_data.tags.time:
@@ -676,7 +699,7 @@ class Application(tk.Frame):
             
     def change_tz(self, newtz):
         self.dateformatter = mdates.ConciseDateFormatter(self.datelocator, tz=pytz.timezone(newtz))
-        self.axes['temp'].xaxis.set_major_formatter(self.dateformatter)
+        self.axes['Temp'].xaxis.set_major_formatter(self.dateformatter)
         self.plot_figure.canvas.draw()
 
         # Get bg for blitting
@@ -688,6 +711,85 @@ class Application(tk.Frame):
             return self.application_title
         else:
             return f'{self.application_title} - {self.session_name}'
+        
+        
+class LimitDialog(object):
+    axislist = ['EDA','BVP','Accel','HR','HRV','Temp']
+    
+    def __init__(self, application):
+        self.app = application
+        self.axislist = application.axes.keys()
+        self.window = self.create_dialog()
+        
+    def apply(self):
+        for ax in self.axislist:
+            self.app.ylims[ax][1] = self.axentry[ax]['toplim_entryvar'].get()
+            self.app.ylims[ax][0] = self.axentry[ax]['botlim_entryvar'].get()
+            
+        self.app.update_ylims()
+    
+
+    def lift(self):
+        self.window.lift()
+
+             
+    def create_entries(self, window, ax, i):
+        rownum = 3*i
+        if i != 0:
+            # separator between them
+            sep = Separator(window, orient='horizontal')
+            sep.grid(row=rownum, column=0, columnspan=3, sticky='EW')
+        else:
+            sep = None
+            
+        ax_label = Label(window, text=ax)
+        ax_label.grid(row=rownum+1, column=0, rowspan=2)
+        toplabel = Label(window, text="Upper limit: ")
+        toplabel.grid(row=rownum+1, column=1)
+        botlabel = Label(window, text="Lower limit: ")
+        botlabel.grid(row=rownum+2, column=1)
+        toplim_entryvar = tk.DoubleVar()
+        toplim_entry = Entry(window, textvariable=toplim_entryvar)
+        toplim_entry.grid(row=rownum+1, column=2)
+        toplim_entry.bind("<Return>", lambda e: self.apply())
+        botlim_entryvar = tk.DoubleVar()
+        botlim_entry = Entry(window, textvariable=botlim_entryvar)
+        botlim_entry.grid(row=rownum+2, column=2)
+        botlim_entry.bind("<Return>", lambda e: self.apply())
+        
+        # Get values from graph
+        current_ylim = self.app.axes[ax].get_ylim()
+        # Truncate to 3 decimals
+        mfact = 1000.
+        current_ylim = [round(x*mfact)/mfact for x in current_ylim]
+        toplim_entryvar.set(current_ylim[1])
+        botlim_entryvar.set(current_ylim[0])
+        
+        return {'sep':sep, 'ax_label':ax_label, 'toplabel':toplabel, 'botlabel':botlabel, \
+            'toplim_entryvar':toplim_entryvar, 'toplim_entry':toplim_entry, \
+            'botlim_entryvar':botlim_entryvar, 'botlim_entry':botlim_entry}
+        
+    
+    def create_dialog(self):
+        ylim_dialog = tk.Toplevel()
+        ylim_dialog.wm_title("Limits")
+
+        self.axentry = {}
+        for (axi, ax) in enumerate(self.axislist):
+            self.axentry[ax] = self.create_entries(ylim_dialog, ax, axi)
+
+        self.apply_btn = Button(ylim_dialog, text="Apply", command=self.apply)
+        self.apply_btn.grid(row=len(self.axislist)*3+2, column=0)
+        
+        # If window gets closed, destroy the object in the application. Ugly, but works.
+        ylim_dialog.protocol("WM_DELETE_WINDOW", self.handle_window_deletion)
+        
+        return ylim_dialog
+            
+            
+    def handle_window_deletion(self):
+        self.app.ylim_dialog = None
+        self.window.destroy() 
         
         
 
